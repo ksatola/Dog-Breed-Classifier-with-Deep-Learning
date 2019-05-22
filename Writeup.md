@@ -30,13 +30,13 @@ The approach we will take to fulfill our objective can be represented by the fol
 - Step 1: Import Datasets
 - Step 2: Detect Humans
 - Step 3: Detect Dogs
-- Step 4: Create a CNN to Classify Dog Breeds (fromScratch - define a baseline)
+- Step 4: Create a CNN to Classify Dog Breeds (baseline)
 - Step 5: Use a CNN to Classify Dog Breeds (using Transfer Learning)
 - Step 6: Create a CNN to Classify Dog Breeds (using Transfer Learning)
 - Step 7: Write your Algorithm
 - Step 8: Test Your Algorithm
 
-## Datasets Import and EDA
+## Step 1: Import Datasets
 
 The first step is importing dog and human images datasets. We populate a few variables through the use of the load_files function from the scikit-learn library:
 
@@ -52,26 +52,159 @@ There are 8351 total dog images in 133 breed categories. For modeling purposes, 
 
 There are 33 to 96 dog images in each category with the mean of 63 dog images per category.
 
-The 
+![Dogs per category](images/dogspercategory.png)
 
-[Dogs per category](images/dogspercategory.png)
+The imported dataset of paths to human images, are stored in the numpy array `human_files`.
+
+## Step 2: Detect Humans
+
+Once the datasets are ready, we can focus on a function to detect whether a human face exists in an image. We use OpenCV's implementation of Haar feature-based cascade classifiers to detect human faces in images. OpenCV provides many pre-trained face detectors, stored as XML files on github. We have downloaded one of these detectors and stored it in the haarcascades directory.
+
+```
+import cv2                                              
+
+# extract pre-trained face detector
+face_cascade = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_alt.xml')
+
+# load color (BGR) image
+img = cv2.imread(human_files[30])
+
+# convert BGR image to grayscale
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+# find faces in image
+faces = face_cascade.detectMultiScale(gray)
+
+# print number of faces detected in the image
+print('Number of faces detected:', len(faces))
+
+# get bounding box for each detected face
+for (x,y,w,h) in faces:
+    # add bounding box to color image
+    cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
+    
+# convert BGR image to RGB for plotting
+cv_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+# display the image, along with bounding box
+plt.imshow(cv_rgb)
+plt.show()
+
+```
+
+![Face detected][images/facedetected.png]
+
+Before using any of the face detectors, it is standard procedure to convert the images to grayscale. The `detectMultiScale` function executes the classifier stored in `face_cascade` and takes the grayscale image as a parameter.
+
+In the above code, `faces` is a numpy array of detected faces, where each row corresponds to a detected face. Each detected face is a 1D array with four entries that specifies the bounding box of the detected face. The first two entries in the array (extracted in the above code as `x` and `y`) specify the horizontal and vertical positions of the top left corner of the bounding box. The last two entries in the array (extracted here as `w` and `h`) specify the width and height of the box.
+
+We can use this procedure to write a function that returns `True` if a human face is detected in an image or `False` otherwise. This function, aptly named `face_detector`, takes a string-valued file path to an image as input and appears in the code block below.
+
+```
+# returns "True" if face is detected in image stored at img_path
+def face_detector(img_path):
+    img = cv2.imread(img_path)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray)
+    return len(faces) > 0
+
+```
+The function, tested on 100 human and 100 dog images, recognized 100% human faces in images comming from humans dataset and wrongly 11% human faces in images comming from the dog dataset (this number should be 0%).
+
+Although not explicitely needed in our example, we could improve human faces recognition by adding more pictures as a result of visual transformations of the core dataset to make sure our dataset can cover some 'non standard' face presentations (like skewed ones, etc.).
+
+## Step 3: Detect Dogs
+
+A pre-trained ResNet-50 model was used to detect dogs in images. 
+
+```
+from keras.applications.resnet50 import ResNet50
+
+# define ResNet50 model
+ResNet50_model = ResNet50(weights='imagenet')
+
+```
+
+Our first line of code downloads the ResNet-50 model, along with weights that have been trained on ImageNet, a very large, very popular dataset used for image classification and other vision tasks. ImageNet contains over 10 million URLs, each linking to an image containing an object from one of 1000 categories. Given an image, this pre-trained ResNet-50 model returns a prediction (derived from the available categories in ImageNet) for the object that is contained in the image.
+
+When using TensorFlow as backend, Keras CNNs require a 4D array (which we'll also refer to as a 4D tensor) as input, with shape (nb_samples,rows,columns,channels),  
+where nb_samples corresponds to the total number of images (or samples), and rows, columns, and channels correspond to the number of rows, columns, and channels for each image, respectively.
+
+The `path_to_tensor` function below takes a string-valued file path to a color image as input and returns a 4D tensor suitable for supplying to a Keras CNN.
+
+```
+from keras.preprocessing import image                  
+from tqdm import tqdm
+
+def path_to_tensor(img_path):
+    # loads RGB image as PIL.Image.Image type
+    img = image.load_img(img_path, target_size=(224, 224))
+    # convert PIL.Image.Image type to 3D tensor with shape (224, 224, 3)
+    x = image.img_to_array(img)
+    # convert 3D tensor to 4D tensor with shape (1, 224, 224, 3) and return 4D tensor
+    return np.expand_dims(x, axis=0)
+
+```
+The `paths_to_tensor `function takes a numpy array of string-valued image paths as input and returns a 4D tensor with shape (nb_samples,224,224,3).
+ 
+Here, `nb_samples` is the number of samples, or number of images, in the supplied array of image paths. 
+
+```
+def paths_to_tensor(img_paths):
+    list_of_tensors = [path_to_tensor(img_path) for img_path in tqdm(img_paths)]
+    return np.vstack(list_of_tensors)
+
+```
+
+The `ResNet50_predict_labels` function makes predictions with ResNet-50.
+
+```
+from keras.applications.resnet50 import preprocess_input, decode_predictions
+
+def ResNet50_predict_labels(img_path):
+    # returns prediction vector for image located at img_path
+    img = preprocess_input(path_to_tensor(img_path))
+    return np.argmax(ResNet50_model.predict(img))
+
+```
+
+Getting the 4D tensor ready for ResNet-50, and for any other pre-trained model in Keras, requires some additional processing. First, the RGB image is converted to BGR by reordering the channels. All pre-trained models have the additional normalization step that the mean pixel (expressed in RGB as [103.939,116.779,123.68] and calculated from all pixels in all images in ImageNet) must be subtracted from every pixel in each image. This is implemented in the imported function `preprocess_input`. 
+
+Now that we have a way to format our image for supplying to ResNet-50, we are now ready to use the model to extract the predictions. This is accomplished with the `predict` method, which returns an array whose  i-th entry is the model's predicted probability that the image belongs to the  i-th ImageNet category.
+
+By taking the `argmax` of the predicted probability vector, we obtain an integer corresponding to the model's predicted object class, which we can identify with an object category through the use of [this dictionary](https://gist.github.com/yrevar/942d3a0ac09ec9e5eb3a).
+
+While looking at the dictionary, we can notice that the categories corresponding to dogs appear in an uninterrupted sequence and correspond to dictionary keys 151-268, inclusive, to include all categories from 'Chihuahua' to 'Mexican hairless'. Thus, in order to check to see if an image is predicted to contain a dog by the pre-trained ResNet-50 model, we need only check if the `ResNet50_predict_labels` function above returns a value between 151 and 268 (inclusive).
+
+We use these ideas to complete the `dog_detector` function below, which returns `True` if a dog is detected in an image (or `False` if not).
+
+```
+### returns "True" if a dog is detected in the image stored at img_path
+def dog_detector(img_path):
+    prediction = ResNet50_predict_labels(img_path)
+    return ((prediction <= 268) & (prediction >= 151)) 
+
+```
+
+The code below tests the performance of your `dog_detector` function.
+
+```
+detected_human_faces = 0
+detected_dog_faces = 0
+
+for i in range(100):
+    if dog_detector(human_files_short[i]):
+        detected_human_faces += 1
+    if dog_detector(dog_files_short[i]):
+        detected_dog_faces +=1
+
+```
+The dog detector's performance is better as it identifies 0 dogs in human dataset and 100% dogs in the dog dataset.
+
+## Step 4: Create a CNN to Classify Dog Breeds 
 
 
-
-
-Detect Humans
-Since we want to identify the most resembling dog breed for a person, a function needs to be written to detect whether a human face exists in an image. This project used a pre-trained face detector provided by OpenCV. Please note that the input image is converted to grayscale before it is fed into the face cascade classifier.
-
-
-Detect Dogs
-Similarly, a dog detector function is needed to determine whether there is actually a dog in the input image. A pre-trained ResNet-50 model is used in this project to detect dogs in images.
-
-
-Keras CNNs require input images to be converted into 4D tensors, so some pre-processing is needed for the image data.
-
-
-The ResNet50_predict_labels function takes an image path as input, and returns the predicted label of that image using the pre-trained ResNet50 model. The ResNet50 dictionary shows that labels between 151 and 268 are all dogs, therefore the dog_detector function can take advantage of this logic to determine whether the input image contains a dog.
-
+(fromScratch - define a baseline)
 
 CNN to Classify Dog Breeds using Transfer Learning
 The full dataset has 8,351 dog images, which is not large enough to train a deep learning model from scratch. Therefore, transfer learning with VGG-19 ( a convolutional neural network that is trained on more than a million images from the ImageNet database) is used to achieve relatively good accuracy with less training time.
