@@ -466,47 +466,8 @@ The output of the `detector` function is as I expected (pretty well), neverthele
 - Playing with hyper-parameters, like learning rate or batch_size could help.
 - Using other CNN archietectures could also have positive impact.
 
+## Conclusion
 
+The above example showed the power of transfer learning where with a relatively small dataset and pre-computed bottleneck features from a pre-trained model we were able to achieve pretty good accuracy. Another advantage of transfer learning is a short period of time needed for training a network.
 
-
-Conclusion
-Thanks to the transfer learning technique, I was able to train a model with relatively small dataset, and achieved pretty good accuracy. In addition, the model was trained within a short period of time, which is quite efficient. The main reason is we can reuse the weights trained by machine learning experts using millions of images.
-
-The initial model was a CNN from scratch, which did not work well. It only reached an accuracy of 1.55%, slight better than random guess. I think it is because the size of dataset is relatively small, and the model architecture might not be well designed.
-
-There are a few possible improvements for the model. First, the parameters of fully connected layers, such as number of layers, number of nodes, dropout percentages, might be tweaked to get better results. Second, using a different optimizer or evaluation metric may also improve model performance. Third, data augmentation could also improve the final model accuracy, as it will generate more training data.
-
-Machine LearningTransfer LearningImage RecognitionData ScienceDeep Learning
-Go to the profile of Shuo Wang
-Shuo Wang
-Related reads
-Kuzushiji-MNIST - Japanese Literature Alternative Dataset for Deep Learning Tasks
-Go to the profile of Rani Horev
-Rani Horev
-Dec 14, 2018
-Related reads
-A Beginner’s Tutorial on Building an AI Image Classifier using PyTorch
-Go to the profile of Alexander Wu
-Alexander Wu
-Feb 4
-Related reads
-Build a simple Image Retrieval System with an Autoencoder
-Go to the profile of Nathan Hubens
-Nathan Hubens
-Aug 24, 2018
-Responses
-Conversation with Shuo Wang.
-Go to the profile of Niteesh Kanungo
-Niteesh Kanungo
-Jan 8
-Can you please share the weights and the source code link?
-
-Go to the profile of Shuo Wang
-Shuo Wang
-Jan 9
-Hi, this is my github: https://github.com/swang13/dog-breeds-classification
-
-
-
-
-
+The initial, baseline model had accuracy of 1.9139%, whereas the last one 72.7273% which is a good result.
