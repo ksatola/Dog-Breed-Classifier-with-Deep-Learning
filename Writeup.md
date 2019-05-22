@@ -2,11 +2,11 @@
 
 ## Introduction
 
-This project is about preparing a classifier allowing dogs and humans recognition. Given an image of a dog, the algorithm will identify an estimate of the dog's breed. If supplied an image of a human, the code will identify the resembling dog breed.
+This project is about preparing a classifier allowing dogs and humans recognition. Given an image of a dog, the algorithm identifies an estimate of the dog's breed. If supplied an image of a human, the code identifies the resembling dog breed.
 
-We will define and train a Convolutional Neural Network  (CNN) using transfer learning, a technique that allows a model developed for a task to be reused as the starting point for another task. CNN network architecture is a specialized setup of interconnected neural network layers used in visal data analysis. CNN model typically consists of convolutional layers, activation function, pooling layers, fully connected layers and normalization layers.
+I define and train Convolutional Neural Networks (CNNs) using transfer learning, a technique that allows a model developed for a task to be reused as the starting point for another task. CNN network architecture is a specialized setup of interconnected neural network layers used in visal data analysis. CNN model typically consists of convolutional layers, activation function, pooling layers, fully connected layers and normalization layers.
 
-This project is part of XXXXXXXX udacity XXXXXXXX
+This project was completed as part of Udacity's [Data Scientist Nanodegree](https://eu.udacity.com/course/data-scientist-nanodegree--nd025) certification.
 
 ![Sample Output][images/sample_dog_output.png]
 

@@ -10,7 +10,7 @@ In this project, I build a pipeline that can be used within a web or mobile app 
 
 This project was completed as part of Udacity's [Data Scientist Nanodegree](https://eu.udacity.com/course/data-scientist-nanodegree--nd025) certification.
 
-## Libraries / modules
+## Libraries / Modules
 
 - Sklearn
 - Keras
