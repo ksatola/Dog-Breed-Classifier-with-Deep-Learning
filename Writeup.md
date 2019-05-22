@@ -33,7 +33,7 @@ The approach we will take to fulfill our objective can be represented by the fol
 - Step 4: Create a CNN to Classify Dog Breeds (baseline)
 - Step 5: Use a CNN to Classify Dog Breeds (using Transfer Learning)
 - Step 6: Create a CNN to Classify Dog Breeds (using Transfer Learning)
-- Step 7: Write your Algorithm
+- Step 7: Write Your Algorithm
 - Step 8: Test Your Algorithm
 
 ## Step 1: Import Datasets
@@ -92,7 +92,7 @@ plt.show()
 
 ```
 
-![Face detected][images/facedetected.png]
+![Face detected](images/facedetected.png)
 
 Before using any of the face detectors, it is standard procedure to convert the images to grayscale. The `detectMultiScale` function executes the classifier stored in `face_cascade` and takes the grayscale image as a parameter.
 
@@ -203,52 +203,270 @@ The dog detector's performance is better as it identifies 0 dogs in human datase
 
 ## Step 4: Create a CNN to Classify Dog Breeds 
 
+Now that we have functions for detecting humans and dogs in images, we need a way to predict breed from images. In this step, I created a CNN that classifies dog breeds.
 
-(fromScratch - define a baseline)
+First, we rescale the images by dividing every pixel in every image by 255.
 
-CNN to Classify Dog Breeds using Transfer Learning
-The full dataset has 8,351 dog images, which is not large enough to train a deep learning model from scratch. Therefore, transfer learning with VGG-19 ( a convolutional neural network that is trained on more than a million images from the ImageNet database) is used to achieve relatively good accuracy with less training time.
+```
+from PIL import Image, ImageFile                            
+ImageFile.LOAD_TRUNCATED_IMAGES = True                 
 
-Bottleneck Features
-The bottleneck features for the VGG-19 network were pre-computed by Udacity, and then imported for later use by the transfer learning model.
+# pre-process the data for Keras
+train_tensors = paths_to_tensor(train_files).astype('float32')/255
+valid_tensors = paths_to_tensor(valid_files).astype('float32')/255
+test_tensors = paths_to_tensor(test_files).astype('float32')/255
+
+```
+
+Then, we create a CNN to classify dog breed. At the end of the below code block, we summarize the layers of your model by executing the line: `model.summary()`.
+
+```
+from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
+from keras.layers import Dropout, Flatten, Dense
+from keras.models import Sequential
+
+model = Sequential()
+
+### TODO: Define your architecture.
+
+model.add(Conv2D(filters=16, kernel_size=2,input_shape=(224, 224, 3)))
+model.add(MaxPooling2D(pool_size=2))
+model.add(Conv2D(filters=32, kernel_size=2,input_shape=(111, 111, 32)))
+model.add(MaxPooling2D(pool_size=2))
+model.add(Conv2D(filters=64, kernel_size=2,input_shape=(55, 55, 64)))
+model.add(MaxPooling2D(pool_size=2))
+model.add(GlobalAveragePooling2D())
+model.add(Dense(133, activation="softmax"))
+
+model.summary()
+
+```
+Below, there is the resulting CNN architecture. This architecture and corresponding model acts as a baseline for improvement.
+
+![CNN Baseline Architecture](images/architecture1.png)
+
+Once the architecture is defined, we compile a model and train it. We use model checkpointing to save the model that attains the best validation loss.
+
+```
+model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+from keras.callbacks import ModelCheckpoint  
+
+epochs = 5
+
+checkpointer = ModelCheckpoint(filepath='saved_models/weights.best.from_scratch.hdf5', 
+                               verbose=1, save_best_only=True)
+
+model.fit(train_tensors, train_targets, 
+          validation_data=(valid_tensors, valid_targets),
+          epochs=epochs, batch_size=20, callbacks=[checkpointer], verbose=1)
+
+```
+After training, we load the model with the Best Validation Loss and try out your model on the test dataset of dog images.
+
+```
+model.load_weights('saved_models/weights.best.from_scratch.hdf5')
+
+# get index of predicted dog breed for each image in test set
+dog_breed_predictions = [np.argmax(model.predict(np.expand_dims(tensor, axis=0))) for tensor in test_tensors]
+
+# report test accuracy
+test_accuracy = 100*np.sum(np.array(dog_breed_predictions)==np.argmax(test_targets, axis=1))/len(dog_breed_predictions)
+
+```
+The acquired test accuracy of this baseline model is 1.9139%.
+
+The full dataset has only 8351 dog images, which is not large enough to train a deep learning model from scratch. That is why transfer learning technique is our next step.
+
+## Step 5: Use a CNN to Classify Dog Breeds (using Transfer Learning)
+
+To reduce training time without sacrificing accuracy, we show you how to train a CNN using transfer learning. In the following step, we will get a chance to use transfer learning to train your own CNN.
+
+We obtain bottleneck features and then define a simple architecture.
+
+```
+bottleneck_features = np.load('bottleneck_features/DogVGG16Data.npz')
+train_VGG16 = bottleneck_features['train']
+valid_VGG16 = bottleneck_features['valid']
+test_VGG16 = bottleneck_features['test']
+
+VGG16_model = Sequential()
+VGG16_model.add(GlobalAveragePooling2D(input_shape=train_VGG16.shape[1:]))
+VGG16_model.add(Dense(133, activation='softmax'))
+
+VGG16_model.summary()
+
+```
+![CNN Architecture](images/cnn_architecture1.png)
+
+Next, we compile and train the new model.
+
+```
+VGG16_model.compile(loss='categorical_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
+
+checkpointer = ModelCheckpoint(filepath='saved_models/weights.best.VGG16.hdf5', 
+                               verbose=1, save_best_only=True)
+
+VGG16_model.fit(train_VGG16, train_targets, 
+          validation_data=(valid_VGG16, valid_targets),
+          epochs=20, batch_size=20, callbacks=[checkpointer], verbose=1)
+
+```
+
+Now we can load the new model with the Best Validation Loss and test it on how well it identifies breed within our test dataset of dog images.
+
+```
+VGG16_model.load_weights('saved_models/weights.best.VGG16.hdf5')
+
+# report test accuracy
+test_accuracy = 100*np.sum(np.array(VGG16_predictions)==np.argmax(test_targets, axis=1))/len(VGG16_predictions)
+
+```
+The test accuracy of the new model is 42.9426%. This is a huge improvement.
+
+##
+
+Encouraged by the latest results, we can try to improve our model by testing different bottleneck features and network architectures. Our goal here is to achieve at least 60% accuracy on the test set.
+
+To achieve our goal, we will use the bottleneck features from a different pre-trained model VGG-19 and add two additional layers to our previous architecture.
+
+```
+bottleneck_features = np.load('bottleneck_features/DogVGG19Data.npz')
+train_VGG19 = bottleneck_features['train']
+valid_VGG19 = bottleneck_features['valid']
+test_VGG19 = bottleneck_features['test']
+
+VGG19_model = Sequential()
+VGG19_model.add(GlobalAveragePooling2D(input_shape=train_VGG19.shape[1:]))
+VGG19_model.add(Dense(256, activation='relu'))
+VGG19_model.add(Dropout(0.2))
+VGG19_model.add(Dense(133, activation='softmax'))
+
+VGG19_model.summary()
+
+```
+
+As a result, we get the architecture where the last convolutional output of VGG-19 acts as input to our model. As dog classifiers, we add a global average pooling layer, two fully connected layers (for better accuracy) and dropout layer (to prevent over-fitting).
+
+![CNN Architecture](images/cnn_architecture2.png)
 
 
-Model Architecture
-The last convolutional output of VGG-19 is fed as input to the model. We only need to add a global average pooling layer and fully connected layers as dog classifiers.
+We compile and train the model in the same way as before.
 
-I added two fully connected layers for better accuracy, and a dropout layer to prevent over-fitting.
+```
+VGG19_model.compile(loss='categorical_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
+
+checkpointer = ModelCheckpoint(filepath='saved_models/weights.best.VGG19.hdf5', 
+                               verbose=1, save_best_only=True)
+
+VGG19_model.fit(train_VGG19, train_targets, 
+          validation_data=(valid_VGG19, valid_targets),
+          epochs=20, batch_size=20, callbacks=[checkpointer], verbose=1)
+
+```
+
+And test its performance using accuracy as our metric (our data is only a little bit imbalanced, so accuracy should be a proper metric to select a good model).
+
+```
+# Load the model weights with the best validation loss.
+
+VGG19_model.load_weights('saved_models/weights.best.VGG19.hdf5')
+
+# get index of predicted dog breed for each image in test set
+VGG19_predictions = [np.argmax(VGG19_model.predict(np.expand_dims(feature, axis=0))) for feature in test_VGG19]
+
+# report test accuracy
+test_accuracy = 100*np.sum(np.array(VGG19_predictions)==np.argmax(test_targets, axis=1))/len(VGG19_predictions)
+
+```
+
+The test accuracy is 72.7273%, almost two times more than before and about 36 times better than our base model (without transfer learning).
+
+We define a `VGG19_predict_breed` function to be used later for preditions. The function takes an image path as input, and returns the predicted dog breeds.
+
+```
+def VGG19_predict_breed(img_path):
+    # extract bottleneck features
+    bottleneck_feature = extract_VGG19(path_to_tensor(img_path))
+    # obtain predicted vector
+    predicted_vector = VGG19_model.predict(bottleneck_feature)
+    # return dog breed that is predicted by the model
+    return dog_names[np.argmax(predicted_vector)]
+
+```
+
+## Step 7: Write Your Algorithm
+
+The pre-last step is to write an algorithm that accepts a file path to an image and first determines whether the image contains a human, dog, or neither. Then,
+
+- if a dog is detected in the image, return the predicted breed.
+- if a human is detected in the image, return the resembling dog breed.
+- if neither is detected in the image, provide output that indicates an error.
+
+Below, there is `detector` function implementing the algorithm and a helper funtion `show_image` to display images.
+
+```
+def show_image(img_path, title="Title"):
+    image = Image.open(img_path)
+    plt.title(title)
+    plt.imshow(image)
+    plt.show()
+
+def detector(img_path):
+    
+    # If the image contains human faces:
+    if (face_detector(img_path)):
+        print("Hello Human!")
+        #predicted_breed = VGG16_predict_breed(img_path)
+        predicted_breed = VGG19_predict_breed(img_path)
+        show_image(img_path, title=f"Predicted:{predicted_breed}")
+        
+        print("You look like a ...")
+        print(predicted_breed.upper())
+    
+    # If the image contain a dog:
+    elif dog_detector(img_path):
+        print("Hello Dog!")
+        #predicted_breed = VGG16_predict_breed(img_path)
+        predicted_breed = VGG19_predict_breed(img_path)
+        show_image(img_path, title=f"Predicted:{predicted_breed}")
+        
+        print("Your breed should be ...")
+        print(predicted_breed.upper())
+        
+    else:
+        print("I couldn't detect any dog or human face in the image.")
+        show_image(img_path, title="...")
+        print("Try with another image!")
+    print("\n\n")
+
+```
+## Step 8: Test Your Algorithm
+
+Now, we can test our predictor choosing randomly (function `randint`) `number_of_examples' images from human and dog datasets.
+
+```
+from random import randint
+
+dog_files = np.hstack([train_files, valid_files, test_files])
+
+number_of_examples = 3
+
+for i in range(number_of_examples):
+    detector(human_files[randint(0, len(dog_files))])
+    
+for i in range(number_of_examples):
+    detector(dog_files[randint(0, len(dog_files))])
+
+```
+
+The output of the `detector` function is as I expected (pretty well), nevertheless the possible areas of improvement could include:
+
+- Adding more images for training, also images augmentation could help in result improvement.
+- Playing with hyper-parameters, like learning rate or batch_size could help.
+- Using other CNN archietectures could also have positive impact.
 
 
-Below is my model architecture:
-
-
-Model Metric
-Accuracy is chosen as the metric to evaluate the model performance. Since data is just slightly imbalanced, accuracy should be a proper metric to select a good model.
-
-
-Train Model
-The model is trained using the pre-computed bottleneck features as input. A model check pointer is used to keep track of the weights for best validation loss. When all epochs are finished, the model weights with the best validation loss are loaded into the VGG19_model, which will be used later for predictions.
-
-
-Make Predictions
-Finally, it is ready to make predictions. The VGG19_predict_breed function takes an image path as input, and returns the predicted dog breeds. The dog_breed_pred function is built on the previous one, and returns predicted results depending on whether a dog or a human is detected in the input image.
-
-
-Results
-The accuracy of the final model on test dataset is about 73%, which is not bad. Originally, I trained a CNN model from scratch without using Transfer Learning, the accuracy was only 1.55%. Then, I created a CNN model using transfer learning and VGG-19 with only one fully connected layer, and was able to reach an accuracy of about 53%. Finally, I added a second fully connected layer to the classifier, and was able to achieve 73% accuracy.
-
-When given an image of a dog, the final model predicts the dog breed. For example,
-
-
-
-If a human is in the input image, it identifies the most resembling dog breed based on the person’s face.
-
-
-Below is a picture of Basenji dog I found online. Does it look somewhat similar to the person above?
-
-
-Image Source: https://www.akc.org/dog-breeds/basenji/
-When the image does not contain a human or a dog, it will tell you that there is no human or dog detected. For example, if I provide a cat picture to the model, it does not try to predict its breed, which is expected.
 
 
 Conclusion
