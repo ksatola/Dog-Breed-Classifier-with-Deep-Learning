@@ -8,9 +8,6 @@ I define and train Convolutional Neural Networks (CNNs) using transfer learning,
 
 This project was completed as part of Udacity's [Data Scientist Nanodegree](https://eu.udacity.com/course/data-scientist-nanodegree--nd025) certification.
 
-![Sample Output][images/sample_dog_output.png]
-
-
 ## Objective
 
 The objective of this project is simply trainining an image classifier to recognize different breeds of dogs, then export it for use in a stand alone application.
